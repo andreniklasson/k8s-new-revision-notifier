@@ -1,0 +1,71 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: deployment-revision-notifier
+rules:
+- apiGroups:
+  - "apps"
+  - extensions
+  resources:
+  - deployments
+  - deployments/status
+  verbs:
+  - get
+  - list
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployment-revision-notifier
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: deployment-revision-notifier
+  namespace: kube-system
+subjects:
+- kind: ServiceAccount
+  name: deployment-revision-notifier
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: deployment-revision-notifier
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: deployment-revision-notifier
+  name: deployment-revision-notifier
+spec:
+  selector:
+    matchLabels:
+      app: deployment-revision-notifier
+  serviceName: "deployment-revision-notifier"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: deployment-revision-notifier
+    spec:
+      containers:
+        - name: deployment-revision-notifier
+          image: <IMAGE_URI>
+          imagePullPolicy: Always
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+          env:
+            - name: SLACK_URL
+              value: <SLACK URL>
+            - name: REVISION_TIMEOUT
+              value: "200"
+      serviceAccountName: deployment-revision-notifier
