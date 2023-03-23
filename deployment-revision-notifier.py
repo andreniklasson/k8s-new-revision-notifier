@@ -24,11 +24,11 @@ def slack_notification(deployment_name, color, payload):
         ]
     )
 
-def check_for_successful_rollout(deployment_name, timeout=REVISION_TIMEOUT):
+def check_for_successful_rollout(deployment_name, namespace,timeout=REVISION_TIMEOUT):
     success = False
     start = time.time()
     while time.time() - start < timeout:
-        response = v1.read_namespaced_deployment_status(deployment_name, "apps")
+        response = v1.read_namespaced_deployment_status(deployment_name, namespace)
         status = response.status
         if (status.updated_replicas == response.spec.replicas and
                 status.replicas == response.spec.replicas and
@@ -43,12 +43,12 @@ def check_for_successful_rollout(deployment_name, timeout=REVISION_TIMEOUT):
     else:
         slack_notification(deployment_name, "danger", "The rollout of the new revision has taken more than " + str(REVISION_TIMEOUT) + " seconds to complete")
 
-def check_for_new_revision(deployment_name, revision):
+def check_for_new_revision(deployment_name, namespace, revision):
     if (deployment_name not in service_dict or service_dict[deployment_name] != revision):
         service_dict[deployment_name] = revision
         slack_notification(deployment_name, "warning", "A new revision has been detected")
 
-        thread = Thread(target=check_for_successful_rollout, args=(deployment_name,))
+        thread = Thread(target=check_for_successful_rollout, args=(deployment_name,namespace,))
         thread.start()
 
 if __name__ == "__main__":
@@ -59,6 +59,5 @@ if __name__ == "__main__":
     while(1):
         response = v1.list_deployment_for_all_namespaces(watch=False)
         for deployment in response.items:
-            check_for_new_revision(deployment.metadata.name, deployment.metadata.annotations['deployment.kubernetes.io/revision'])
+            check_for_new_revision(deployment.metadata.name, deployment.metadata.namespace,deployment.metadata.annotations['deployment.kubernetes.io/revision'])
         time.sleep(3)
-
